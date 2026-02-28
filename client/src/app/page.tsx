@@ -6,7 +6,12 @@ import { IconBolt, IconArrowRight } from "@tabler/icons-react"
 import Link from "next/link"
 
 export default async function Home() {
-  const session = await getUserSession()
+  let session = null
+  try {
+    session = await getUserSession()
+  } catch (error) {
+    console.error("Failed to fetch session:", error)
+  }
 
   if (session?.user) {
     const userRole = (session.user as unknown as { role: string }).role
