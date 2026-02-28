@@ -197,45 +197,44 @@ export class BinanceUserDataStream {
         const apiKey = this.exchange.apiKey;
         const base = env.BINANCE_BASE_URL;
 
-        // Try Margin endpoint first (new /sapi/v1/userListenToken endpoint)
-        let resp = await fetch(`${base}/sapi/v1/userListenToken`, {
+        // 1. Try Cross-Margin endpoint
+        let resp = await fetch(`${base}/sapi/v1/userDataStream`, {
             method: "POST",
             headers: { "X-MBX-APIKEY": apiKey },
         });
 
-        if (!resp.ok) {
-            const errorText = await resp.text();
-            console.warn(`[WS-DEBUG] Margin ListenToken failed for ${this.exchange.id}: ${resp.status} ${errorText}`);
+        if (resp.ok) {
+            const data = await resp.json() as { listenKey: string };
+            return data.listenKey;
         }
 
-        // Fallback to Spot endpoint if Margin fails
-        if (!resp.ok) {
-            resp = await fetch(`${base}/api/v3/userDataStream`, {
-                method: "POST",
-                headers: { "X-MBX-APIKEY": apiKey },
-            });
-
-            if (!resp.ok) {
-                const spotErrorText = await resp.text();
-                console.warn(`[WS-DEBUG] Spot ListenToken failed for ${this.exchange.id}: ${resp.status} ${spotErrorText}`);
-            }
+        // Log Margin failure for debugging
+        const marginError = await resp.text();
+        if (resp.status === 400 || resp.status === 401) {
+            console.warn(`[WS-DEBUG] Margin ListenToken failed (Permission?): ${resp.status} ${marginError}`);
         }
 
-        if (!resp.ok) {
-            // Permanent deactivation if credentials are rejected or expired
-            if (resp.status === 401 || resp.status === 410) {
-                console.warn(`[WS] DEACTIVATING exchange ${this.exchange.id} due to invalid/expired keys (${resp.status} ${resp.statusText})`);
-                await db.exchange.update({
-                    where: { id: this.exchange.id },
-                    data: { isActive: false }
-                }).catch(err => console.error(`[WS] Failed to deactivate exchange in DB:`, err));
-                return null;
-            }
-            throw new Error(`Failed to create listenKey (both Spot & Margin rejected): ${resp.statusText}`);
+        // 2. Try Spot endpoint (Official /api/v3/userDataStream)
+        resp = await fetch(`${base}/api/v3/userDataStream`, {
+            method: "POST",
+            headers: { "X-MBX-APIKEY": apiKey },
+        });
+
+        if (resp.ok) {
+            const data = await resp.json() as { listenKey: string };
+            return data.listenKey;
         }
 
-        const data = await resp.json() as { listenKey?: string, listenToken?: string, token?: string };
-        return data.listenKey || data.listenToken || data.token || null;
+        const spotError = await resp.text();
+        console.warn(`[WS-DEBUG] Spot ListenToken failed: ${resp.status} ${spotError}`);
+
+        // Handle specific codes (just log, don't deactivate)
+        if (resp.status === 401 || resp.status === 410) {
+            console.warn(`[WS] API keys for ${this.exchange.id} are invalid or expired (${resp.status})`);
+            return null;
+        }
+
+        throw new Error(`Failed to create listenKey for ${this.exchange.id}`);
     }
 
     private async pingListenKey(): Promise<void> {
@@ -243,7 +242,7 @@ export class BinanceUserDataStream {
         const base = env.BINANCE_BASE_URL;
 
         // Try Margin endpoint first
-        let resp = await fetch(`${base}/sapi/v1/userListenToken?listenKey=${this.listenKey}`, {
+        let resp = await fetch(`${base}/sapi/v1/userDataStream?listenKey=${this.listenKey}`, {
             method: "PUT",
             headers: { "X-MBX-APIKEY": apiKey },
         });
