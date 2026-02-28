@@ -1,0 +1,499 @@
+// Bytix AI — Prisma Schema
+// server/prisma/schema.prisma  ←  MUST always be identical to client/prisma/schema.prisma
+// After any change: run `bunx prisma migrate dev` + `bunx prisma generate` in BOTH projects.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN // Full platform access
+  AGENT // Can view/manage assigned customers
+  CUSTOMER // Can only access own data
+}
+
+enum ExchangeName {
+  BINANCE
+}
+
+enum MarginType {
+  CROSS // Shared margin pool across all pairs
+}
+
+enum PositionMode {
+  ONE_WAY // One position per symbol (long OR short)
+  HEDGE // Can hold long AND short simultaneously
+}
+
+enum BotStatus {
+  ACTIVE // Accepting and processing signals
+  PAUSED // Ignoring signals but not deleted
+  STOPPED // Manually stopped
+  ERROR // Failed — needs attention
+}
+
+enum TradeSide {
+  LONG // Bought / expecting price to rise
+  SHORT // Sold/borrowed / expecting price to fall
+}
+
+enum TradeType {
+  SPOT // Buy/sell owned assets, no leverage
+  MARGIN // Borrowed assets, can go short, leverage
+}
+
+enum SignalAction {
+  ENTER_LONG // Open a LONG position
+  ENTER_SHORT // Open a SHORT position (margin only)
+  EXIT_LONG // Close the open LONG position
+  EXIT_SHORT // Close the open SHORT position
+}
+
+enum SignalStatus {
+  PENDING // Just created, not yet processed
+  PROCESSING // Lock acquired, currently executing
+  PROCESSED // Successfully completed
+  FAILED // Error during execution
+  SKIPPED // Intentionally ignored (wrong side, no position, etc.)
+}
+
+enum PositionStatus {
+  OPEN // Active, can be closed
+  CLOSED // Manually or signal closed
+  PARTIALLY_CLOSED // Partial exit (rare)
+  LIQUIDATED // Force-closed by exchange due to margin call
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LOSS
+  TAKE_PROFIT
+  OCO // One-Cancels-the-Other (SL + TP combined)
+  STOP_LOSS_LIMIT
+  TAKE_PROFIT_LIMIT
+}
+
+enum OrderPurpose {
+  ENTRY // Opening the position
+  EXIT // Closing the position
+  STOP_LOSS // Protective stop loss order
+  TAKE_PROFIT // Protective take profit order
+  BORROW // Borrowing assets (margin)
+  REPAY // Repaying borrowed assets (margin)
+}
+
+enum OrderStatus {
+  PENDING // Submitted to Binance, awaiting confirmation
+  OPEN // Active on the exchange order book
+  PARTIALLY_FILLED // Some quantity filled
+  FILLED // Fully executed
+  CANCELED // Canceled by us or expired
+  REJECTED // Rejected by exchange
+  EXPIRED // Time-in-force expired
+  ERROR // Failed to submit
+}
+
+enum SideEffectType {
+  NO_SIDE_EFFECT // Normal order, no borrowing
+  MARGIN_BUY // Auto-borrow before buying
+  AUTO_REPAY // Auto-repay after selling
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  BORROW
+  REPAY
+  FEE
+  REALIZED_PNL
+}
+
+enum RiskLevel {
+  SAFE // marginLevel >= 2.0  — normal trading
+  WARNING // marginLevel 1.5–1.99 — reduce exposure
+  DANGER // marginLevel < 1.5   — block all new trades
+}
+
+// ─────────────────────────────────────────────────────────────
+// BETTER AUTH MODELS — Do NOT add custom fields to these
+// ─────────────────────────────────────────────────────────────
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String? // hashed, for credential auth
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CORE MODELS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String?
+  image         String?
+  role          Role     @default(CUSTOMER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Self-relation: CUSTOMER → AGENT
+  agentId   String?
+  agent     User?   @relation("AgentCustomers", fields: [agentId], references: [id])
+  customers User[]  @relation("AgentCustomers")
+
+  // Better Auth
+  sessions Session[]
+  accounts Account[]
+
+  // Platform data
+  portfolio    Portfolio?
+  exchanges    Exchange[]
+  bots         Bot[]
+  positions    Position[]
+  transactions Transaction[]
+
+  @@map("user")
+}
+
+model Portfolio {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Lifetime stats
+  totalPnl        Decimal @default(0) @db.Decimal(20, 8)
+  totalPnlPercent Decimal @default(0) @db.Decimal(10, 4)
+  winRate         Decimal @default(0) @db.Decimal(5, 2)
+  totalTrades     Int     @default(0)
+  winningTrades   Int     @default(0)
+  losingTrades    Int     @default(0)
+
+  // Time-windowed P&L (updated by cron)
+  dailyPnl   Decimal @default(0) @db.Decimal(20, 8)
+  weeklyPnl  Decimal @default(0) @db.Decimal(20, 8)
+  monthlyPnl Decimal @default(0) @db.Decimal(20, 8)
+
+  // Balance summary (USD equivalent)
+  totalBalance     Decimal @default(0) @db.Decimal(20, 8)
+  availableBalance Decimal @default(0) @db.Decimal(20, 8)
+  totalDebt        Decimal @default(0) @db.Decimal(20, 8)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Exchange {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name  ExchangeName @default(BINANCE)
+  label String? // User-defined name e.g. "Main Account"
+
+  // ⚠️ AES-256-GCM encrypted — NEVER store plaintext, NEVER return in any response
+  apiKey    String
+  apiSecret String
+
+  positionMode PositionMode @default(ONE_WAY)
+  isActive     Boolean      @default(false)
+
+  // Aggregated balances (USD equiv)
+  spotUsd          Decimal @default(0) @db.Decimal(20, 8)
+  marginUsd        Decimal @default(0) @db.Decimal(20, 8)
+  totalValue       Decimal @default(0) @db.Decimal(20, 8)
+  availableBalance Decimal @default(0) @db.Decimal(20, 8)
+
+  bots           Bot[]
+  marginAccounts MarginAccount[]
+  transactions   Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model MarginAccount {
+  id         String   @id @default(cuid())
+  exchangeId String
+  exchange   Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  marginType MarginType
+
+  // Risk
+  marginLevel      Decimal?  @db.Decimal(10, 4) // Binance ratio (higher = safer)
+  riskLevel        RiskLevel @default(SAFE)
+  liquidationPrice Decimal?  @db.Decimal(20, 8)
+
+  // Aggregated balance (USD equiv)
+  totalAssetUsd     Decimal @default(0) @db.Decimal(20, 8)
+  totalLiabilityUsd Decimal @default(0) @db.Decimal(20, 8)
+  netAssetUsd       Decimal @default(0) @db.Decimal(20, 8)
+
+  lastSyncAt DateTime? // Last time synced from Binance
+
+  borrowedAssets BorrowedAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([exchangeId, marginType])
+  @@index([exchangeId])
+}
+
+model BorrowedAsset {
+  id              String        @id @default(cuid())
+  marginAccountId String
+  marginAccount   MarginAccount @relation(fields: [marginAccountId], references: [id], onDelete: Cascade)
+
+  asset    String // e.g. "USDT", "BTC", "ETH"
+  borrowed Decimal @db.Decimal(20, 8) // Principal borrowed
+  interest Decimal @default(0) @db.Decimal(20, 8) // Accrued interest
+  free     Decimal @default(0) @db.Decimal(20, 8) // Available to use
+  locked   Decimal @default(0) @db.Decimal(20, 8) // Locked in open orders
+  netAsset Decimal @default(0) @db.Decimal(20, 8) // free + locked - borrowed - interest
+
+  dailyInterestRate Decimal? @db.Decimal(10, 8) // From Binance, e.g. 0.00027
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([marginAccountId, asset])
+}
+
+model Bot {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchangeId String
+  exchange   Exchange @relation(fields: [exchangeId], references: [id])
+
+  name        String
+  description String?
+  status      BotStatus @default(ACTIVE)
+
+  // Strategy
+  tradeType  TradeType       @default(SPOT)
+  marginType MarginType? // null for SPOT bots
+  pairs      String[] // e.g. ["BTCUSDT", "ETHUSDT"]
+  orderType  OrderType?      @default(MARKET)
+  sideEffect SideEffectType? @default(NO_SIDE_EFFECT)
+
+  // Sizing
+  tradeAmount Decimal @db.Decimal(20, 8)
+  amountUnit  String  @default("quote") // "quote" or "base"
+  quantity    Decimal @default(0) @db.Decimal(20, 8)
+  leverage    Int     @default(1) // 1 = no leverage (spot), 2-20 for margin
+
+  // TP/SL (in percentage, e.g. 1.5 for 1.5%)
+  tpPercent Decimal? @db.Decimal(10, 4)
+  slPercent Decimal? @db.Decimal(10, 4)
+
+  // Webhook auth
+  webhookSecret String? // Verified against payload.secret on every webhook hit
+
+  signals   Signal[]
+  positions Position[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([exchangeId])
+}
+
+model Signal {
+  id    String @id @default(cuid())
+  botId String
+  bot   Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  action SignalAction
+  symbol String // Trading pair, e.g. "BTCUSDT"
+  status SignalStatus @default(PENDING)
+
+  rawPayload Json? // Full webhook body stored for debugging
+
+  // Idempotency — prevents double-execution
+  processed    Boolean   @default(false)
+  processedAt  DateTime?
+  errorMessage String?
+
+  // Created position (if signal opened one)
+  positionId String?
+  position   Position? @relation(fields: [positionId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([botId, processed])
+  @@index([symbol])
+}
+
+model Position {
+  id     String  @id @default(cuid())
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  botId  String?
+  bot    Bot?    @relation(fields: [botId], references: [id])
+
+  symbol     String // e.g. "BTCUSDT"
+  side       TradeSide // LONG or SHORT
+  tradeType  TradeType // SPOT or MARGIN
+  marginType MarginType? // null for SPOT
+  leverage   Int         @default(1)
+
+  // Pricing
+  entryPrice   Decimal? @db.Decimal(20, 8) // Set when ENTRY order fills
+  exitPrice    Decimal? @db.Decimal(20, 8) // Set when EXIT order fills
+  quantity     Decimal  @db.Decimal(20, 8) // In base asset (e.g. BTC)
+  notionalUsdt Decimal? @db.Decimal(20, 8) // quantity × entryPrice
+
+  // TP/SL Targets
+  tpPrice Decimal? @db.Decimal(20, 8)
+  slPrice Decimal? @db.Decimal(20, 8)
+
+  // P&L (set on close)
+  realizedPnl   Decimal @default(0) @db.Decimal(20, 8)
+  unrealizedPnl Decimal @default(0) @db.Decimal(20, 8) // Updated by WS
+  pnlPercent    Decimal @default(0) @db.Decimal(10, 4)
+  fee           Decimal @default(0) @db.Decimal(20, 8) // Accumulated fees
+
+  status PositionStatus @default(OPEN)
+
+  // Reconciliation
+  isReconciled Boolean   @default(false) // DB matches Binance truth
+  lastSyncAt   DateTime?
+
+  openedAt  DateTime  @default(now())
+  closedAt  DateTime?
+  updatedAt DateTime  @updatedAt
+
+  signals Signal[]
+  orders  Order[]
+
+  @@index([userId, status])
+  @@index([botId])
+  @@index([symbol])
+}
+
+model Order {
+  id         String   @id @default(cuid())
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  // Binance IDs
+  binanceOrderId  String? // Binance's orderId (integer, stored as string)
+  binanceClientId String? // Our custom clientOrderId (for tracking)
+
+  symbol     String
+  side       String // "BUY" or "SELL" (Binance terminology)
+  type       OrderType
+  purpose    OrderPurpose // Why this order exists (ENTRY, EXIT, STOP_LOSS, etc.)
+  sideEffect SideEffectType @default(NO_SIDE_EFFECT)
+
+  // Sizing
+  quantity      Decimal  @db.Decimal(20, 8)
+  price         Decimal? @db.Decimal(20, 8) // null for MARKET orders
+  stopPrice     Decimal? @db.Decimal(20, 8) // For STOP_LOSS orders
+  quoteQuantity Decimal? @db.Decimal(20, 8) // For MARKET by quote amount
+
+  // Fill tracking (updated via WebSocket)
+  filledQuantity Decimal  @default(0) @db.Decimal(20, 8)
+  fillPercent    Decimal  @default(0) @db.Decimal(5, 2)
+  avgFillPrice   Decimal? @db.Decimal(20, 8)
+  fee            Decimal  @default(0) @db.Decimal(20, 8)
+  feeAsset       String? // e.g. "BNB", "USDT"
+
+  status       OrderStatus @default(PENDING)
+  errorMessage String? // ⚠️ ALWAYS populate on Binance errors — never null on failure
+
+  rawResponse Json? // Full Binance API response — for auditing
+
+  submittedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  filledAt    DateTime? // Set when status = FILLED
+
+  @@index([positionId])
+  @@index([binanceOrderId])
+  @@index([symbol, status])
+}
+
+model Transaction {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchangeId String?
+  exchange   Exchange? @relation(fields: [exchangeId], references: [id])
+
+  type     TransactionType
+  asset    String // e.g. "USDT", "BTC"
+  amount   Decimal         @db.Decimal(20, 8)
+  fee      Decimal         @default(0) @db.Decimal(20, 8)
+  usdValue Decimal?        @db.Decimal(20, 8) // USD equiv at time of transaction
+
+  // Soft references (not FK — keeps transactions valid even if records deleted)
+  binanceTxId String?
+  positionId  String?
+  orderId     String?
+
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([positionId])
+}

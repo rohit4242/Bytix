@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.next/
+dist/
+build/
+bun.lockb
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Prisma
+/client/prisma/*.db
+/server/prisma/*.db
