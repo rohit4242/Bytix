@@ -10,29 +10,36 @@
 import { Hono } from "hono";
 import { WebhookPayloadSchema } from "../validation/signal.schema";
 import { runWebhookPipeline } from "../services/signal-pipeline";
+import { parseStringSignal } from "../services/signal-parser";
 
 export const webhookRoutes = new Hono();
 
 webhookRoutes.post("/bot/:botId", async (c) => {
     const { botId } = c.req.param();
 
-    // Parse body — TradingView sends JSON but handle raw text too
-    let rawBody: unknown;
+    let payload: any = null;
+    const rawText = await c.req.text();
+
+    // 1. Try JSON parsing
     try {
-        const contentType = c.req.header("content-type") ?? "";
-        if (contentType.includes("application/json")) {
-            rawBody = await c.req.json();
-        } else {
-            rawBody = JSON.parse(await c.req.text());
-        }
+        payload = JSON.parse(rawText);
+        console.log("Webhook received (JSON):", JSON.stringify(payload));
     } catch {
-        return c.json({ success: false, error: "Invalid request body — expected JSON" });
+        // 2. If not JSON, try string parsing
+        console.log("Webhook received (Raw Text):", rawText);
+        payload = parseStringSignal(rawText);
+
+        if (!payload) {
+            return c.json({
+                success: false,
+                error: "Invalid request body — expected JSON or valid string signal"
+            });
+        }
+        console.log("Webhook parsed (String):", JSON.stringify(payload));
     }
 
-    console.log("Webhook received:", JSON.stringify(rawBody));
-
-    // Validate payload schema
-    const parsed = WebhookPayloadSchema.safeParse(rawBody);
+    // 3. Validate payload schema (for JSON source, string source is already validated in parser but safe to re-check)
+    const parsed = WebhookPayloadSchema.safeParse(payload);
     if (!parsed.success) {
         return c.json({
             success: false,
@@ -40,7 +47,7 @@ webhookRoutes.post("/bot/:botId", async (c) => {
         });
     }
 
-    // Run the full pipeline — always returns 200
+    // 4. Run the full pipeline — always returns 200
     const result = await runWebhookPipeline(botId, parsed.data);
     return c.json(result);
 });
