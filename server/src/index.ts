@@ -10,6 +10,7 @@ import { cors } from "hono/cors";
 import { env } from "./lib/env";
 import { auth } from "./lib/auth";
 import { loggerMiddleware } from "./middleware/logger";
+import { securityMiddleware } from "./middleware/security";
 import { errorHandler } from "./middleware/error-handler";
 import router from "./routes/index";
 import { startWebSocketManager } from "./binance/websocket";
@@ -28,7 +29,13 @@ app.use(
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
+
+// 1. Block malicious scans immediately
+app.use("*", securityMiddleware);
+
+// 2. Log accepted requests
 app.use("*", loggerMiddleware);
+
 app.use("*", withPrisma);
 app.onError(errorHandler);
 
