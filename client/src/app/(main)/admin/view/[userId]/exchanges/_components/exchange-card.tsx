@@ -31,19 +31,24 @@ export function ExchangeCard({ exchange, onToggle, onEdit, onDelete }: ExchangeC
         setSyncing(true)
         const toastId = toast.loading("Syncing with Binance...")
         try {
-            await syncExchange(exchange.id)
-            setLastSynced(new Date().toLocaleString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-            }))
-            toast.success("Balances synced successfully", { id: toastId })
+            const result = await syncExchange(exchange.id)
+            if (result.success) {
+                setLastSynced(new Date().toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }))
+                toast.success("Balances synced successfully", { id: toastId })
+            } else {
+                console.error("Sync failed:", result.error)
+                toast.error(result.error || "Sync failed. Check your API keys.", { id: toastId })
+            }
         } catch (error: any) {
-            console.error("Sync failed:", error)
-            toast.error(error.message || "Sync failed. Check your API keys.", { id: toastId })
+            console.error("Sync caught error:", error)
+            toast.error("Internal connection error. Please try again.", { id: toastId })
         } finally {
             setSyncing(false)
         }

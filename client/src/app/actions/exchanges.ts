@@ -157,14 +157,27 @@ export async function syncExchange(exchangeId: string) {
     await requireRole("ADMIN", "AGENT")
 
     try {
+        // Fetch exchange to get userId for revalidation
+        const exchange = await db.exchange.findUnique({
+            where: { id: exchangeId },
+            select: { userId: true }
+        })
+
+        if (!exchange) {
+            return { success: false, error: "Exchange not found" }
+        }
+
         const response = await api.post(`/exchanges/${exchangeId}/sync`)
 
-        // Revalidate the current page to show updated balances
-        revalidatePath(`/admin/view/`) // Revalidate more broadly or specific path if known
+        // Revalidate the specific user exchanges page
+        revalidatePath(`/admin/view/${exchange.userId}/exchanges`)
 
-        return response.data
+        return { success: true, data: response.data }
     } catch (error: any) {
         console.error("[Sync Action] Error:", error.response?.data || error.message)
-        throw new Error(error.response?.data?.error || "Failed to sync exchange balances")
+        return {
+            success: false,
+            error: error.response?.data?.error || error.message || "Failed to sync exchange balances"
+        }
     }
 }
