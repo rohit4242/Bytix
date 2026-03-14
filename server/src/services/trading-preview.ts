@@ -54,11 +54,27 @@ export async function getTradingPreview(exchange: Exchange, symbol: string) {
                 getMarginAccount(clients.margin)
             ]);
 
-            if (borrowQuoteResult.success) maxBorrowQuote = borrowQuoteResult.data?.amount || 0;
-            else if (!apiError) apiError = borrowQuoteResult.error || `Failed to fetch ${quoteAsset} borrowable`;
+            if (borrowQuoteResult.success) {
+                maxBorrowQuote = borrowQuoteResult.data?.amount || 0;
+            } else {
+                // -3045 means the asset is not borrowable on cross-margin (e.g. FDUSD).
+                // This is expected — treat it as maxBorrow = 0, do NOT surface as a user error.
+                const isBorrowNotSupported = borrowQuoteResult.error?.includes("-3045") ||
+                    borrowQuoteResult.error?.includes("does not have enough asset");
+                if (!isBorrowNotSupported && !apiError) {
+                    apiError = borrowQuoteResult.error || `Failed to fetch ${quoteAsset} borrowable`;
+                }
+            }
 
-            if (borrowBaseResult.success) maxBorrowBase = borrowBaseResult.data?.amount || 0;
-            else if (!apiError) apiError = borrowBaseResult.error || `Failed to fetch ${baseAsset} borrowable`;
+            if (borrowBaseResult.success) {
+                maxBorrowBase = borrowBaseResult.data?.amount || 0;
+            } else {
+                const isBorrowNotSupported = borrowBaseResult.error?.includes("-3045") ||
+                    borrowBaseResult.error?.includes("does not have enough asset");
+                if (!isBorrowNotSupported && !apiError) {
+                    apiError = borrowBaseResult.error || `Failed to fetch ${baseAsset} borrowable`;
+                }
+            }
 
             if (marginAccResult.success && marginAccResult.data) {
                 marginAccData = marginAccResult.data;

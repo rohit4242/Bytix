@@ -457,7 +457,9 @@ function BuyingPowerBar({
             ? "text-warning"
             : "text-muted-foreground"
 
-    const decimals = unit === "USDT" || unit === "USD" ? 2 : 8
+    // Use 2 decimals for stablecoins/fiat quote assets (USDT, FDUSD, USDC, BUSD, etc.)
+    const isStablecoin = /USD|USDC|BUSD|FDUSD|DAI|EUR|GBP/.test(unit)
+    const decimals = isStablecoin ? 2 : 8
 
     return (
         <div className="flex flex-col gap-1.5">

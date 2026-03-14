@@ -62,6 +62,15 @@ export function ManualTriggerModal({ open, onOpenChange, bot, onConfirm }: Manua
     const isSpot = bot.tradeType === "SPOT" || bot.tradeType?.toString() === "SPOT"
     const actionOptions = isSpot ? ["ENTER_LONG", "EXIT_LONG"] : ["ENTER_LONG", "ENTER_SHORT", "EXIT_LONG", "EXIT_SHORT"]
     const effectiveAmount = bot.tradeAmount * (bot.leverage || 1)
+    // Derive quote asset label from the pair name (e.g. BTCUSDT → USDT, BTCFDUSD → FDUSD)
+    const pair = bot.pairs?.[0] || ""
+    const quoteLabel = pair.endsWith("FDUSD") ? "FDUSD"
+        : pair.endsWith("USDC") ? "USDC"
+        : pair.endsWith("BUSD") ? "BUSD"
+        : pair.endsWith("USDT") ? "USDT"
+        : pair.endsWith("BTC") ? "BTC"
+        : pair.endsWith("ETH") ? "ETH"
+        : "USDT"
 
     return (
         <Dialog open={open} onOpenChange={(val) => { if (!val) handleClose() }}>
@@ -115,7 +124,7 @@ export function ManualTriggerModal({ open, onOpenChange, bot, onConfirm }: Manua
                                         label="Trade Amount"
                                         value={
                                             bot.amountUnit === "quote"
-                                                ? `${Number(bot.tradeAmount).toFixed(2)} USDT`
+                                                ? `${Number(bot.tradeAmount).toFixed(2)} ${quoteLabel}`
                                                 : `${Number(bot.tradeAmount).toFixed(8)} BASE`
                                         }
                                         mono
@@ -125,7 +134,7 @@ export function ManualTriggerModal({ open, onOpenChange, bot, onConfirm }: Manua
                                             label="Effective Amount"
                                             value={
                                                 bot.amountUnit === "quote"
-                                                    ? `${effectiveAmount.toFixed(2)} USDT`
+                                                    ? `${effectiveAmount.toFixed(2)} ${quoteLabel}`
                                                     : `${effectiveAmount.toFixed(8)} BASE`
                                             }
                                             mono
