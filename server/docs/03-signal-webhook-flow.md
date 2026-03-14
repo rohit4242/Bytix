@@ -18,7 +18,7 @@ This is the ONLY entry point for automated trading signals. TradingView or any a
 {
   "secret": "bot-webhook-secret",
   "action": "ENTER_LONG",
-  "symbol": "BTCUSDT"
+  "symbol": "BTCFDUSD"
 }
 ```
 

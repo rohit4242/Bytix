@@ -232,7 +232,7 @@ export async function getPairs(exchangeId: string) {
     }
 
     // Fallback to mock pairs if backend fails or doesn't exist yet
-    return ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "XRPUSDT", "DOTUSDT", "DOGEUSDT"]
+    return ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "XRPUSDT", "DOTUSDT", "DOGEUSDT", "BTCFDUSD", "ETHFDUSD"]
 }
 
 /**

@@ -24,7 +24,7 @@ import { ArrowRight, Bot, Wifi, WifiOff } from "lucide-react"
 import { SanitizedExchange } from "@/app/actions/exchanges"
 import { TradeType, OrderType } from "@/generated/prisma"
 
-const TRADING_PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "DOTUSDT", "DOGEUSDT"]
+const TRADING_PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "DOTUSDT", "DOGEUSDT", "BTCFDUSD", "ETHFDUSD"]
 
 interface StepBotConfigProps {
     exchanges: SanitizedExchange[]
