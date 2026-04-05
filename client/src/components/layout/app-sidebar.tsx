@@ -51,7 +51,9 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <UserSelector role={sidebarData.user.role as "ADMIN" | "AGENT"} />
+        {(sidebarData.user.role === "ADMIN" || sidebarData.user.role === "AGENT") && (
+          <UserSelector role={sidebarData.user.role as "ADMIN" | "AGENT"} />
+        )}
       </SidebarHeader>
 
       <SidebarContent>
