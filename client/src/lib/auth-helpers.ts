@@ -53,7 +53,7 @@ export async function requireRole(...roles: UserRole[]) {
     const roleString = (session.user as { role?: string }).role || ""
     const currentRole = roleString.toUpperCase() as UserRole
     if (!roles.includes(currentRole)) {
-        redirect("/unauthorized")
+        redirect(`/unauthorized?source=requireRole&currentRole=${currentRole}&original=${roleString}`)
     }
     return session
 }

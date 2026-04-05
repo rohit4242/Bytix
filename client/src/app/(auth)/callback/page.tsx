@@ -29,7 +29,7 @@ export default function AuthCallback() {
       router.replace(roleRedirectURL[userRole as keyof typeof roleRedirectURL])
     } else {
       // Fallback to unauthorized if role is unknown
-      router.replace("/unauthorized")
+      router.replace(`/unauthorized?role=${rawRole}&hasSession=${!!session}&hasUser=${!!session?.user}`)
     }
   }, [session, isPending, router])
 
