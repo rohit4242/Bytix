@@ -186,7 +186,7 @@ export function SignalsTable({ data, onDelete, onDeleteAll }: SignalsTableProps)
                             <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Symbol</TableHead>
                             <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
                             <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Timestamp</TableHead>
-                            <TableHead className="w-[50px]" />
+                            {onDelete && <TableHead className="w-[50px]" />}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -256,28 +256,30 @@ export function SignalsTable({ data, onDelete, onDeleteAll }: SignalsTableProps)
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                disabled={isDeleting}
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setConfirmAction({ type: "SINGLE", id: signal.id })
-                                                }}
-                                            >
-                                                {isDeleting ? (
-                                                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                )}
-                                            </Button>
-                                        </TableCell>
+                                        {onDelete && (
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                    disabled={isDeleting}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setConfirmAction({ type: "SINGLE", id: signal.id })
+                                                    }}
+                                                >
+                                                    {isDeleting ? (
+                                                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    )}
+                                                </Button>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                     {isExpanded && (
                                         <TableRow className="hover:bg-transparent">
-                                            <TableCell colSpan={7} className="p-0">
+                                            <TableCell colSpan={onDelete ? 7 : 6} className="p-0">
                                                 <div className="border-t border-border bg-muted/5 px-6 py-4 animate-in fade-in-0 slide-in-from-top-1 duration-200">
                                                     <SignalDetail signal={signal} />
                                                 </div>

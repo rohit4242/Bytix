@@ -1,4 +1,4 @@
-import { getSignals, deleteSignal, deleteAllSignals } from "@/app/actions/signals"
+import { getSignals } from "@/app/actions/signals"
 import { SignalsTable } from "../../admin/view/[userId]/signals/_components/signals-table"
 import { getUserSession } from "@/lib/auth-server"
 
@@ -16,17 +16,7 @@ export default async function CustomerSignalsPage() {
                 <p className="text-muted-foreground font-medium">Real-time bot execution logs and webhook alerts.</p>
             </div>
 
-            <SignalsTable 
-                data={signals} 
-                onDelete={async (id) => {
-                    "use server"
-                    await deleteSignal(id)
-                }}
-                onDeleteAll={async () => {
-                    "use server"
-                    await deleteAllSignals(userId)
-                }}
-            />
+            <SignalsTable data={signals} />
         </div>
     )
 }
