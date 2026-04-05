@@ -9,7 +9,7 @@ import { api } from "@/lib/api"
  * Fetch positions for a specific user.
  */
 export async function getPositions(targetUserId: string, status?: "OPEN" | "CLOSED") {
-    await requireRole("ADMIN", "AGENT")
+    await requireRole("ADMIN", "AGENT", "CUSTOMER")
 
     const positions = await db.position.findMany({
         where: {

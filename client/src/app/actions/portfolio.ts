@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/auth-helpers"
  * Fetch portfolio summary for a specific user.
  */
 export async function getPortfolio(targetUserId: string) {
-    await requireRole("ADMIN", "AGENT")
+    await requireRole("ADMIN", "AGENT", "CUSTOMER")
 
     const [exchanges, closedPositions, openPositions, activeBots] = await Promise.all([
         db.exchange.findMany({
@@ -60,7 +60,7 @@ export async function getPortfolio(targetUserId: string) {
  * Fetch Cumulative P&L history for the 30-day chart.
  */
 export async function getSnapshots(targetUserId: string) {
-    await requireRole("ADMIN", "AGENT")
+    await requireRole("ADMIN", "AGENT", "CUSTOMER")
 
     // Fetch closed positions to build a P&L timeline
     const closedPositions = await db.position.findMany({

@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache"
  * NOTE: Signals are linked to users via their parent Bot.
  */
 export async function getSignals(targetUserId: string, botId?: string) {
-    await requireRole("ADMIN", "AGENT")
+    await requireRole("ADMIN", "AGENT", "CUSTOMER")
 
     const signals = await db.signal.findMany({
         where: {

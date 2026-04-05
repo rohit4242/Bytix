@@ -253,30 +253,14 @@ export const customerSidebarData: SidebarData = {
     ],
     navSecondary: [
         { title: "Account Settings", url: "/customer/settings", icon: "settings" },
-        { title: "Help & FAQ", url: "/customer/help", icon: "help" },
     ],
     navGroups: [
         {
             title: "General",
             items: [
                 { title: "Dashboard", url: "/customer", icon: "dashboard" },
-                {
-                    title: "My Orders",
-                    url: "/customer/orders",
-                    icon: "package",
-                    items: [
-                        { title: "Active", url: "/customer/orders/active" },
-                        { title: "Past Orders", url: "/customer/orders/history" },
-                    ],
-                },
-                { title: "Merchants", url: "/customer/merchants", icon: "store" },
-            ],
-        },
-        {
-            title: "Account",
-            items: [
-                { title: "Profile", url: "/customer/profile", icon: "user-circle" },
-                { title: "Security", url: "/customer/security", icon: "shield" },
+                { title: "Active Positions", url: "/customer/positions", icon: "activity" },
+                { title: "Signals", url: "/customer/signals", icon: "broadcast" },
             ],
         },
     ],
