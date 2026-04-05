@@ -50,8 +50,9 @@ export async function requireAuth() {
 /** Use when a route requires a specific role */
 export async function requireRole(...roles: UserRole[]) {
     const session = await requireAuth()
-    const role = (session.user as { role?: string }).role as UserRole
-    if (!roles.includes(role)) {
+    const roleString = (session.user as { role?: string }).role || ""
+    const currentRole = roleString.toUpperCase() as UserRole
+    if (!roles.includes(currentRole)) {
         redirect("/unauthorized")
     }
     return session

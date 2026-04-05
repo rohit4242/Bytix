@@ -22,7 +22,9 @@ export default function AuthCallback() {
     }
 
     // Role based redirect using the role from session
-    const userRole = (session.user as unknown as { role: string }).role
+    const rawRole = (session.user as unknown as { role: string }).role || ""
+    const userRole = rawRole.toUpperCase()
+    
     if (userRole && userRole in roleRedirectURL) {
       router.replace(roleRedirectURL[userRole as keyof typeof roleRedirectURL])
     } else {
